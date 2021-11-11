@@ -78,7 +78,7 @@ static inline uint32_t buffer_bits_used(struct BitBuf2 *me)
 static inline void flush_bits(struct BitBuf2 *me)
 {
 	uint32_t bits;
-	store_u64(me->m_out_buf, me->m_bits);
+	store_le_u64(me->m_out_buf, me->m_bits);
 	bits = me->m_bit_count & ~7;
 	me->m_bit_count -= bits;
 	me->m_out_buf += bits/8;
@@ -91,7 +91,7 @@ static inline void flush(struct BitBuf2 *me)
 {
 	uint32_t bytes;
 	if (me->m_bit_count) {
-		store_u64(me->m_out_buf, me->m_bits);
+		store_le_u64(me->m_out_buf, me->m_bits);
 		bytes = (me->m_bit_count + 7) / 8;
 		me->m_out_buf += bytes;
 	}

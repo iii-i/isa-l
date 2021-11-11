@@ -257,8 +257,8 @@ static inline int compare258(uint8_t * str1, uint8_t * str2, uint32_t max_length
 	loop_length = max_length & ~0x7;
 
 	for(count = 0; count < loop_length; count += 8){
-		test = load_u64(str1);
-		test ^= load_u64(str2);
+		test = load_le_u64(str1);
+		test ^= load_le_u64(str2);
 		if(test != 0)
 			return count + tzbytecnt(test);
 		str1 += 8;
@@ -315,8 +315,8 @@ static inline int compare(uint8_t * str1, uint8_t * str2, uint32_t max_length)
 	loop_length = max_length & ~0x7;
 
 	for(count = 0; count < loop_length; count += 8){
-		test = load_u64(str1);
-		test ^= load_u64(str2);
+		test = load_le_u64(str1);
+		test ^= load_le_u64(str2);
 		if(test != 0)
 			return count + tzbytecnt(test);
 		str1 += 8;
