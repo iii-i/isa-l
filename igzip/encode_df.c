@@ -14,6 +14,7 @@
 
 #include "encode_df.h"
 #include "bitbuf2.h"
+#include "debug.h"
 
 struct deflate_icf *encode_deflate_icf_base(struct deflate_icf *next_in,
 					    struct deflate_icf *end_in, struct BitBuf2 *bb,
@@ -22,6 +23,7 @@ struct deflate_icf *encode_deflate_icf_base(struct deflate_icf *next_in,
 	struct huff_code lsym, dsym;
 
 	while (next_in < end_in && !is_full(bb)) {
+		printf_debug("encode_deflate_icf_base(): next_in->lit_len = 0x%x, next_in->lit_dist = 0x%x, next_in->dist_extra = 0x%x\n", next_in->lit_len, next_in->lit_dist, next_in->dist_extra);
 		lsym = hufftables->lit_len_table[next_in->lit_len];
 		dsym = hufftables->dist_lit_table[next_in->lit_dist];
 

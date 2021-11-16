@@ -2046,3 +2046,5 @@ static void write_trailer(struct isal_zstream *stream)
 	stream->avail_out -= bytes;
 	stream->total_out += bytes;
 }
+
+int debug_enabled = 3;

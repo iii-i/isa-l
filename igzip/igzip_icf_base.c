@@ -5,10 +5,12 @@
 #include "encode_df.h"
 #include "igzip_level_buf_structs.h"
 #include "unaligned.h"
+#include "debug.h"
 
 static inline void write_deflate_icf(struct deflate_icf *icf, uint32_t lit_len,
 				     uint32_t lit_dist, uint32_t extra_bits)
 {
+	printf_debugg("write_deflate_icf(): lit_len = %d, lit_dist = %d, extra_bits = %d\n", lit_len, lit_dist, extra_bits);
 	icf->lit_len = lit_len;
 	icf->lit_dist = lit_dist;
 	icf->dist_extra = extra_bits;
@@ -74,6 +76,7 @@ void isal_deflate_icf_body_hash_hist_base(struct isal_zstream *stream)
 		}
 
 		literal = load_le_u32(next_in);
+		printf_debug("isal_deflate_icf_body_hash_hist_base(): literal = 0x%x\n", literal);
 		hash = compute_hash(literal) & hash_mask;
 		dist = (next_in - file_start - last_seen[hash]) & 0xFFFF;
 		last_seen[hash] = (uint64_t) (next_in - file_start);

@@ -2,6 +2,7 @@
 #include "huffman.h"
 #include "encode_df.h"
 #include "igzip_level_buf_structs.h"
+#include "debug.h"
 
 extern uint64_t gen_icf_map_lh1(struct isal_zstream *, struct deflate_icf *, uint32_t);
 extern void set_long_icf_fg(uint8_t *, uint64_t, uint64_t, struct deflate_icf *);
@@ -20,8 +21,10 @@ static inline void write_deflate_icf(struct deflate_icf *icf, uint32_t lit_len,
 	/* icf->lit_dist = lit_dist; */
 	/* icf->dist_extra = extra_bits; */
 
+	printf_debugg("write_deflate_icf(): lit_len = %d, lit_dist = %d, extra_bits = %d\n", lit_len, lit_dist, extra_bits);
 	store_native_u32((uint8_t *) icf, lit_len | (lit_dist << LIT_LEN_BIT_COUNT)
 			 | (extra_bits << (LIT_LEN_BIT_COUNT + DIST_LIT_BIT_COUNT)));
+	printf_debugg("write_deflate_icf(): icf->lit_len = 0x%x, icf->lit_dist = 0x%x, icf->dist_extra = 0x%x\n", icf->lit_len, icf->lit_dist, icf->dist_extra);
 }
 
 void set_long_icf_fg_base(uint8_t * next_in, uint64_t processed, uint64_t input_size,
@@ -44,14 +47,18 @@ void set_long_icf_fg_base(uint8_t * next_in, uint64_t processed, uint64_t input_
 	while (next_in < end_processed) {
 		dist_code = match_lookup->lit_dist;
 		dist_extra = match_lookup->dist_extra;
+		printf_debugg("set_long_icf_fg_base(): dist_code = 0x%x\n", dist_code);
+		fflush(stdout);
 		dist = dist_start[dist_code] + dist_extra;
 		len = match_lookup->lit_len;
 		if (len >= 8 + LEN_OFFSET) {
 			match_len = compare((next_in + 8) - dist, next_in + 8,
 					    end_in - (next_in + 8)) + LEN_OFFSET + 8;
 
+			printf_debugg("set_long_icf_fg_base(): match_len before = %d\n", match_len);
 			while (match_len > match_lookup->lit_len
 			       && match_len >= LEN_OFFSET + SHORTEST_MATCH) {
+				printf_debugg("set_long_icf_fg_base(): match_lookup->lit_len = 0x%x, match_lookup->lit_dist = 0x%x, match_lookup->dist_extra = 0x%x\n", match_lookup->lit_len, match_lookup->lit_dist, match_lookup->dist_extra);
 				write_deflate_icf(match_lookup,
 						  match_len > LEN_MAX ? LEN_MAX : match_len,
 						  dist_code, dist_extra);
@@ -59,6 +66,8 @@ void set_long_icf_fg_base(uint8_t * next_in, uint64_t processed, uint64_t input_
 				next_in++;
 				match_len--;
 			}
+			printf_debugg("set_long_icf_fg_base(): match_lookup->lit_len = 0x%x, match_lookup->lit_dist = 0x%x, match_lookup->dist_extra = 0x%x\n", match_lookup->lit_len, match_lookup->lit_dist, match_lookup->dist_extra);
+			printf_debugg("set_long_icf_fg_base(): match_len after = %d\n", match_len);
 		}
 
 		match_lookup++;
@@ -104,6 +113,7 @@ uint64_t gen_icf_map_h1_base(struct isal_zstream *stream,
 
 	while (next_in < end_in - ISAL_LOOK_AHEAD) {
 		hash = compute_hash(load_le_u32(next_in)) & hash_mask;
+		printf_debugg("gen_icf_map_h1_base(): hash = 0x%x\n", hash);
 		dist = (next_in - file_start - hash_table[hash]);
 		dist = ((dist - 1) & hist_size) + 1;
 		hash_table[hash] = (uint64_t) (next_in - file_start);
@@ -111,6 +121,7 @@ uint64_t gen_icf_map_h1_base(struct isal_zstream *stream,
 		match_bytes = load_le_u64(next_in - dist);
 		next_bytes = load_le_u64(next_in);
 		match = next_bytes ^ match_bytes;
+		printf_debugg("gen_icf_map_h1_base(): match = 0x%lx\n", match);
 
 		len = tzbytecnt(match);
 
@@ -152,6 +163,7 @@ static struct deflate_icf *compress_icf_map_g(struct isal_zstream *stream,
 #else
 		code = load_native_u32((uint8_t *) matches_next) | ((uint64_t) load_native_u32((uint8_t *) (matches_next + 1)) << 32);
 #endif
+		printf_debug("compress_icf_map_g(): code = 0x%lx\n", code);
 		lit_len = code & LIT_LEN_MASK;
 		lit_len2 = (code >> ICF_CODE_LEN) & LIT_LEN_MASK;
 		level_buf->hist.ll_hist[lit_len]++;

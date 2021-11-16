@@ -34,6 +34,7 @@
 #include "igzip_checksums.h"
 #include "igzip_wrapper.h"
 #include "unaligned.h"
+#include "debug.h"
 
 #ifndef NO_STATIC_INFLATE_H
 #include "static_inflate.h"
@@ -243,6 +244,7 @@ static void inline inflate_in_load(struct inflate_state *state, int min_required
 		 * that to fill read_in */
 		new_bytes = 8 - (state->read_in_length + 7) / 8;
 		temp = load_le_u64(state->next_in);
+		printf_debugg("inflate_in_load(): avail_in = %u, temp = 0x%lx\n", state->avail_in, temp);
 
 		state->read_in |= temp << state->read_in_length;
 		state->next_in += new_bytes;
@@ -251,8 +253,10 @@ static void inline inflate_in_load(struct inflate_state *state, int min_required
 
 	} else {
 		/* Else fill the read_in buffer 1 byte at a time */
+		printf_debugg("inflate_in_load(): bytes\n");
 		while (state->read_in_length < 57 && state->avail_in > 0) {
 			temp = *state->next_in;
+			printf_debugg("inflate_in_load(): temp = 0x%lx\n", temp);
 			state->read_in |= temp << state->read_in_length;
 			state->next_in++;
 			state->avail_in--;
@@ -260,6 +264,8 @@ static void inline inflate_in_load(struct inflate_state *state, int min_required
 
 		}
 	}
+
+	printf_debugg("inflate_in_load(): state->read_in = 0x%lx\n", state->read_in);
 }
 
 static uint64_t inline inflate_in_read_bits_unsafe(struct inflate_state *state,
@@ -271,6 +277,7 @@ static uint64_t inline inflate_in_read_bits_unsafe(struct inflate_state *state,
 	state->read_in >>= bit_count;
 	state->read_in_length -= bit_count;
 
+	printf_debug("inflate_in_read_bits_unsafe(%d) = 0x%lx\n", bit_count, ret);
 	return ret;
 }
 
@@ -304,8 +311,10 @@ static int inline set_codes(struct huff_code *huff_code_table, int table_length,
 
 	max = (next_code[MAX_HUFF_TREE_DEPTH] + count[MAX_HUFF_TREE_DEPTH]);
 
-	if (max > (1 << MAX_HUFF_TREE_DEPTH))
+	if (max > (1 << MAX_HUFF_TREE_DEPTH)) {
+		printf_debug("%s:%d\n", __FILE__, __LINE__);
 		return ISAL_INVALID_BLOCK;
+	}
 
 	/* Calculate code corresponding to a given symbol */
 	for (; huff_code_table < table_end; huff_code_table++) {
@@ -368,8 +377,10 @@ static int inline set_and_expand_lit_len_huffcode(struct huff_code *lit_len_huff
 
 	max = (next_code[MAX_HUFF_TREE_DEPTH] + count[MAX_HUFF_TREE_DEPTH]);
 
-	if (max > (1 << MAX_HUFF_TREE_DEPTH))
+	if (max > (1 << MAX_HUFF_TREE_DEPTH)) {
+		printf_debug("%s:%d\n", __FILE__, __LINE__);
 		return ISAL_INVALID_BLOCK;
+	}
 
 	memcpy(count, expand_count, sizeof(*count) * MAX_LIT_LEN_COUNT);
 
@@ -459,6 +470,7 @@ static void make_inflate_huff_code_lit_len(struct inflate_huff_code_large *resul
 	uint32_t max_symbol = MAX_LIT_LEN_SYM;
 
 	code_list_len = count_total[MAX_LIT_LEN_COUNT - 1];
+	printf_debug("code_list_len = %d\n", code_list_len);
 
 	if (code_list_len == 0) {
 		memset(result->short_code_lookup, 0, sizeof(result->short_code_lookup));
@@ -496,6 +508,7 @@ static void make_inflate_huff_code_lit_len(struct inflate_huff_code_large *resul
 			short_code_lookup[sym1_code] =
 			    sym1 | sym1_len << LARGE_SHORT_CODE_LEN_OFFSET |
 			    (1 << LARGE_SYM_COUNT_OFFSET);
+			printf_debug("short_code_lookup[0x%x] = 0x%x\n", sym1_code, short_code_lookup[sym1_code]);
 		}
 
 		/* Continue if no pairs are possible */
@@ -533,6 +546,7 @@ static void make_inflate_huff_code_lit_len(struct inflate_huff_code_large *resul
 				    sym1 | (sym2 << 8) |
 				    (code_length << LARGE_SHORT_CODE_LEN_OFFSET)
 				    | (2 << LARGE_SYM_COUNT_OFFSET);
+				printf_debug("short_code_lookup[0x%x] = 0x%x\n", code, short_code_lookup[code]);
 			}
 		}
 
@@ -588,6 +602,7 @@ static void make_inflate_huff_code_lit_len(struct inflate_huff_code_large *resul
 					    sym1 | (sym2 << 8) | sym3 << 16 |
 					    (code_length << LARGE_SHORT_CODE_LEN_OFFSET)
 					    | (3 << LARGE_SYM_COUNT_OFFSET);
+					printf_debug("short_code_lookup[0x%x] = 0x%x\n", code, short_code_lookup[code]);
 
 				}
 
@@ -825,6 +840,7 @@ static void inline make_inflate_huff_code_header(struct inflate_huff_code_small 
 	memcpy(count_total_tmp, count_total, sizeof(count_total_tmp));
 
 	code_list_len = count_total[16];
+	printf_debug("make_inflate_huff_code_header(): code_list_len = %d\n", code_list_len);
 	if (code_list_len == 0) {
 		memset(result->short_code_lookup, 0, sizeof(result->short_code_lookup));
 		return;
@@ -866,6 +882,7 @@ static void inline make_inflate_huff_code_header(struct inflate_huff_code_small 
 			 * bit 15 is a flag representing this is a symbol*/
 			short_code_lookup[huff_code_table[i].code] =
 			    i | (huff_code_table[i].length) << SMALL_SHORT_CODE_LEN_OFFSET;
+			printf_debug("make_inflate_huff_code_header(): short_code_lookup[0x%x] = 0x%x\n", huff_code_table[i].code, short_code_lookup[huff_code_table[i].code]);
 		}
 	}
 
@@ -915,6 +932,7 @@ static void inline make_inflate_huff_code_header(struct inflate_huff_code_small 
 		}
 		result->short_code_lookup[first_bits] = long_code_lookup_length |
 		    (max_length << SMALL_SHORT_CODE_LEN_OFFSET) | SMALL_FLAG_BIT;
+		printf_debug("make_inflate_huff_code_header(): short_code_lookup[0x%x] = 0x%x\n", first_bits, result->short_code_lookup[first_bits]);
 		long_code_lookup_length += 1 << (max_length - ISAL_DECODE_SHORT_BITS);
 
 	}
@@ -1079,6 +1097,7 @@ static void inline decode_next_lit_len(uint32_t * next_lits, uint32_t * sym_coun
 	 * this code are located. Note the hint is at largest the location the
 	 * first actual symbol in the long code list.*/
 	next_sym = huff_code->short_code_lookup[next_bits];
+	printf_debug("state->read_in = 0x%lx, next_bits = 0x%x, next_sym = 0x%x\n", state->read_in, next_bits, next_sym);
 
 	if ((next_sym & LARGE_FLAG_BIT) == 0) {
 		/* Return symbol found if next_code is a complete huffman code
@@ -1183,6 +1202,8 @@ static uint16_t inline decode_next_header(struct inflate_state *state,
 		inflate_in_load(state, 0);
 
 	next_bits = state->read_in & ((1 << ISAL_DECODE_SHORT_BITS) - 1);
+	printf_debug("decode_next_header(): ISAL_DECODE_SHORT_BITS = %d\n", ISAL_DECODE_SHORT_BITS);
+	printf_debug("decode_next_header(): next_bits = 0x%x\n", next_bits);
 
 	/* next_sym is a possible symbol decoded from next_bits. If bit 15 is 0,
 	 * next_code is a symbol. Bits 9:0 represent the symbol, and bits 14:10
@@ -1191,11 +1212,13 @@ static uint16_t inline decode_next_header(struct inflate_state *state,
 	 * this code are located. Note the hint is at largest the location the
 	 * first actual symbol in the long code list.*/
 	next_sym = huff_code->short_code_lookup[next_bits];
+	printf_debug("decode_next_header(): next_sym = 0x%x\n", next_sym);
 
 	if ((next_sym & SMALL_FLAG_BIT) == 0) {
 		/* Return symbol found if next_code is a complete huffman code
 		 * and shift in buffer over by the length of the next_code */
 		bit_count = next_sym >> SMALL_SHORT_CODE_LEN_OFFSET;
+		printf_debug("decode_next_header(): bit_count = %d\n", bit_count);
 		state->read_in >>= bit_count;
 		state->read_in_length -= bit_count;
 
@@ -1275,8 +1298,10 @@ static int inline setup_dynamic_header(struct inflate_state *state)
 	hdist = inflate_in_read_bits_unsafe(state, 5);
 	hclen = inflate_in_read_bits_unsafe(state, 4);
 
-	if (hlit > 29 || hdist > 29 || hclen > 15)
+	if (hlit > 29 || hdist > 29 || hclen > 15) {
+		printf_debug("%s:%d\n", __FILE__, __LINE__);
 		return ISAL_INVALID_BLOCK;
+	}
 
 	/* Create the code huffman code for decoding the lit/len and dist huffman codes */
 	for (i = 0; i < 4; i++) {
@@ -1300,8 +1325,10 @@ static int inline setup_dynamic_header(struct inflate_state *state)
 	if (state->read_in_length < 0)
 		return ISAL_END_INPUT;
 
-	if (!flag || set_codes(code_huff, CODE_LEN_CODES, code_count))
+	if (!flag || set_codes(code_huff, CODE_LEN_CODES, code_count)) {
+		printf_debug("%s:%d\n", __FILE__, __LINE__);
 		return ISAL_INVALID_BLOCK;
+	}
 
 	make_inflate_huff_code_header(&inflate_code_huff, code_huff, CODE_LEN_CODES,
 				      code_count, CODE_LEN_CODES);
@@ -1316,8 +1343,10 @@ static int inline setup_dynamic_header(struct inflate_state *state)
 
 		if (state->read_in_length < 0) {
 			if (current > &lit_and_dist_huff[256]
-			    && lit_and_dist_huff[256].length <= 0)
+			    && lit_and_dist_huff[256].length <= 0) {
+				printf_debug("%s:%d\n", __FILE__, __LINE__);
 				return ISAL_INVALID_BLOCK;
+			}
 			return ISAL_END_INPUT;
 		}
 
@@ -1352,8 +1381,10 @@ static int inline setup_dynamic_header(struct inflate_state *state)
 
 			i = 3 + inflate_in_read_bits(state, 2);
 
-			if (current + i > end || previous == NULL)
+			if (current + i > end || previous == NULL) {
+				printf_debug("%s:%d\n", __FILE__, __LINE__);
 				return ISAL_INVALID_BLOCK;
+			}
 
 			rep_code = *previous;
 			for (j = 0; j < i; j++) {
@@ -1417,19 +1448,25 @@ static int inline setup_dynamic_header(struct inflate_state *state)
 					previous = current - 1;
 			}
 
-		} else
+		} else {
+			printf_debug("%s:%d\n", __FILE__, __LINE__);
 			return ISAL_INVALID_BLOCK;
+		}
 
 	}
 
-	if (current > end || lit_and_dist_huff[256].length <= 0)
+	if (current > end || lit_and_dist_huff[256].length <= 0) {
+		printf_debug("%s:%d\n", __FILE__, __LINE__);
 		return ISAL_INVALID_BLOCK;
+	}
 
 	if (state->read_in_length < 0)
 		return ISAL_END_INPUT;
 
-	if (set_codes(&lit_and_dist_huff[LIT_LEN], DIST_LEN, dist_count))
+	if (set_codes(&lit_and_dist_huff[LIT_LEN], DIST_LEN, dist_count)) {
+		printf_debug("%s:%d\n", __FILE__, __LINE__);
 		return ISAL_INVALID_BLOCK;
+	}
 
 	if (state->hist_bits && state->hist_bits < 15)
 		max_dist = 2 * state->hist_bits;
@@ -1438,8 +1475,10 @@ static int inline setup_dynamic_header(struct inflate_state *state)
 				    DIST_LEN, dist_count, max_dist);
 
 	if (set_and_expand_lit_len_huffcode
-	    (lit_and_dist_huff, LIT_LEN, lit_count, lit_expand_count, code_list))
+	    (lit_and_dist_huff, LIT_LEN, lit_count, lit_expand_count, code_list)) {
+		printf_debug("%s:%d\n", __FILE__, __LINE__);
 		return ISAL_INVALID_BLOCK;
+	}
 
 	make_inflate_huff_code_lit_len(&state->lit_huff_code, lit_and_dist_huff, LIT_LEN_ELEMS,
 				       lit_count, code_list, multisym);
@@ -1485,8 +1524,10 @@ static int read_header(struct inflate_state *state)
 		state->read_in_length -= 32;
 
 		/* Check if len and nlen match */
-		if (len != (~nlen & 0xffff))
+		if (len != (~nlen & 0xffff)) {
+			printf_debug("%s:%d 0x%x != ~0x%x\n", __FILE__, __LINE__, len, nlen);
 			return ISAL_INVALID_BLOCK;
+		}
 
 		state->type0_block_len = len;
 		state->block_state = ISAL_BLOCK_TYPE0;
@@ -1499,8 +1540,10 @@ static int read_header(struct inflate_state *state)
 	else if (btype == 2)
 		ret = setup_dynamic_header(state);
 
-	else
+	else {
+		printf_debug("%s:%d\n", __FILE__, __LINE__);
 		ret = ISAL_INVALID_BLOCK;
+	}
 
 	return ret;
 }
@@ -1517,6 +1560,8 @@ static int read_header_stateful(struct inflate_state *state)
 	int ret;
 	int copy_size;
 	int bytes_read;
+
+	printf_debug("read_header_stateful(block_state_start=%d)\n", block_state_start);
 
 	if (block_state_start == ISAL_BLOCK_HDR) {
 		/* Setup so read_header decodes data in tmp_in_buffer */
@@ -1562,6 +1607,7 @@ static int inline decode_literal_block(struct inflate_state *state)
 	uint32_t len = state->type0_block_len;
 	uint32_t bytes = state->read_in_length / 8;
 	uint64_t read_in;
+	uint32_t ii;
 	/* If the block is uncompressed, perform a memcopy while
 	 * updating state data */
 	state->block_state = state->bfinal ? ISAL_BLOCK_INPUT_DONE : ISAL_BLOCK_NEW_HDR;
@@ -1579,6 +1625,8 @@ static int inline decode_literal_block(struct inflate_state *state)
 		read_in = to_le64(state->read_in);
 		if (len >= bytes) {
 			memcpy(state->next_out, &read_in, bytes);
+			for (ii = 0; ii < bytes; ii++)
+				printf_debug("%s:%d 0x%02x\n", __FILE__, __LINE__, state->next_out[ii]);
 
 			state->next_out += bytes;
 			state->avail_out -= bytes;
@@ -1592,6 +1640,8 @@ static int inline decode_literal_block(struct inflate_state *state)
 
 		} else {
 			memcpy(state->next_out, &read_in, len);
+			for (ii = 0; ii < len; ii++)
+				printf_debug("%s:%d 0x%02x\n", __FILE__, __LINE__, state->next_out[ii]);
 
 			state->next_out += len;
 			state->avail_out -= len;
@@ -1605,6 +1655,8 @@ static int inline decode_literal_block(struct inflate_state *state)
 		}
 	}
 	memcpy(state->next_out, state->next_in, len);
+	for (ii = 0; ii < len; ii++)
+		printf_debug("%s:%d 0x%02x\n", __FILE__, __LINE__, state->next_out[ii]);
 
 	state->next_out += len;
 	state->avail_out -= len;
@@ -1636,6 +1688,9 @@ int decode_huffman_code_block_stateless_base(struct inflate_state *state, uint8_
 	uint32_t avail_in_tmp, avail_out_tmp, total_out_tmp;
 	uint32_t next_lits, sym_count;
 	struct rfc1951_tables *rfc = &rfc_lookup_table;
+	uint32_t ii;
+
+	printf_debug("decode_huffman_code_block_stateless_base()\n");
 
 	state->copy_overflow_length = 0;
 	state->copy_overflow_distance = 0;
@@ -1644,6 +1699,7 @@ int decode_huffman_code_block_stateless_base(struct inflate_state *state, uint8_
 		/* While not at the end of block, decode the next
 		 * symbol */
 		inflate_in_load(state, 0);
+		printf_debug("%s:%d read_in = 0x%lx\n", __FILE__, __LINE__, state->read_in);
 
 		read_in_tmp = state->read_in;
 		read_in_length_tmp = state->read_in_length;
@@ -1654,6 +1710,7 @@ int decode_huffman_code_block_stateless_base(struct inflate_state *state, uint8_
 		total_out_tmp = state->total_out;
 
 		decode_next_lit_len(&next_lits, &sym_count, state, &state->lit_huff_code);
+		printf_debug("next_lits = 0x%x, sym_count = %u\n", next_lits, sym_count);
 
 		if (sym_count == 0)
 			return ISAL_INVALID_SYMBOL;
@@ -1668,6 +1725,7 @@ int decode_huffman_code_block_stateless_base(struct inflate_state *state, uint8_
 
 		while (sym_count > 0) {
 			next_lit = next_lits & 0xffff;
+			printf_debug("next_lit = %u\n", next_lit);
 			if (next_lit < 256 || sym_count > 1) {
 				/* If the next symbol is a literal,
 				 * write out the symbol and update state
@@ -1692,6 +1750,7 @@ int decode_huffman_code_block_stateless_base(struct inflate_state *state, uint8_
 				}
 
 				*state->next_out = next_lit;
+				printf_debug("%s:%d 0x%02x\n", __FILE__, __LINE__, next_lit);
 				state->next_out++;
 				state->avail_out--;
 				state->total_out++;
@@ -1712,6 +1771,7 @@ int decode_huffman_code_block_stateless_base(struct inflate_state *state, uint8_
 				 * state data accordingly*/
 				repeat_length = next_lit - 254;
 				next_dist = decode_next_dist(state, &state->dist_huff_code);
+				printf_debug("decode_huffman_code_block_stateless_base(): next_dist = 0x%x\n", next_dist);
 
 				if (state->read_in_length >= 0) {
 					if (next_dist >= DIST_LEN)
@@ -1721,6 +1781,7 @@ int decode_huffman_code_block_stateless_base(struct inflate_state *state, uint8_
 					    inflate_in_read_bits(state,
 								 rfc->dist_extra_bit_count
 								 [next_dist]);
+					printf_debug("look_back_dist = %u\n", look_back_dist);
 				}
 
 				if (state->read_in_length < 0) {
@@ -1753,6 +1814,8 @@ int decode_huffman_code_block_stateless_base(struct inflate_state *state, uint8_
 				else
 					byte_copy(state->next_out, look_back_dist,
 						  repeat_length);
+				for (ii = 0; ii < repeat_length; ii++)
+					printf_debugg("%s:%d 0x%02x\n", __FILE__, __LINE__, state->next_out[ii]);
 
 				state->next_out += repeat_length;
 				state->avail_out -= repeat_length;
@@ -1824,6 +1887,8 @@ static inline uint32_t fixed_size_read(struct inflate_state *state,
 				       uint8_t ** read_buf, int read_size)
 {
 	uint32_t tmp_in_size = state->tmp_in_size;
+
+	printf_debug("fixed_size_read(%d)\n", read_size);
 
 	if (state->avail_in + tmp_in_size < read_size) {
 		memcpy(state->tmp_in_buffer + tmp_in_size, state->next_in, state->avail_in);
@@ -2023,6 +2088,8 @@ int isal_read_gzip_header(struct inflate_state *state, struct isal_gzip_header *
 	uint32_t hcrc = gz_hdr->hcrc;
 	int ret = 0;
 
+	printf_debug("isal_read_gzip_header()\n");
+
 	/* This switch is a jump table into the function so that decoding the
 	 * header can continue where it stopped on the last call */
 	switch (block_state) {
@@ -2141,6 +2208,8 @@ int isal_read_zlib_header(struct inflate_state *state, struct isal_zlib_header *
 	uint8_t *next_in;
 	int ret = 0;
 
+	printf_debug("isal_read_zlib_header()\n");
+
 	switch (block_state) {
 	case ISAL_BLOCK_NEW_HDR:
 		zlib_hdr->dict_flag = 0;
@@ -2215,6 +2284,8 @@ int isal_inflate_stateless(struct inflate_state *state)
 	state->hist_bits = 0;
 	state->tmp_in_size = 0;
 
+	printf_debug("isal_inflate_stateless(crc_flag=%d)\n", state->crc_flag);
+
 	if (state->crc_flag == IGZIP_GZIP) {
 		struct isal_gzip_header gz_hdr;
 		isal_gzip_header_init(&gz_hdr);
@@ -2232,12 +2303,15 @@ int isal_inflate_stateless(struct inflate_state *state)
 	}
 
 	while (state->block_state != ISAL_BLOCK_FINISH) {
+		printf_debug("block_state = %d\n", state->block_state);
 		if (state->block_state == ISAL_BLOCK_NEW_HDR) {
 			ret = read_header(state);
 
 			if (ret)
 				break;
 		}
+
+		printf_debug("%s:%d state->read_in = 0x%lx\n", __FILE__, __LINE__, state->read_in);
 
 		if (state->block_state == ISAL_BLOCK_TYPE0)
 			ret = decode_literal_block(state);
@@ -2287,6 +2361,7 @@ int isal_inflate(struct inflate_state *state)
 	uint32_t copy_size = 0;
 	int32_t shift_size = 0;
 	int ret = 0;
+	uint32_t ii;
 
 	if (!state->wrapper_flag && state->crc_flag == IGZIP_GZIP) {
 		struct isal_gzip_header gz_hdr;
@@ -2360,6 +2435,8 @@ int isal_inflate(struct inflate_state *state)
 			/* Copy valid data from internal buffer into out_buffer */
 			if (state->write_overflow_len != 0) {
 				store_le_u32(state->next_out, state->write_overflow_lits);
+				for (ii = 0; ii < state->write_overflow_len; ii++)
+					printf_debug("%s:%d 0x%02x\n", __FILE__, __LINE__, state->next_out[ii]);
 				state->next_out += state->write_overflow_len;
 				state->total_out += state->write_overflow_len;
 				state->write_overflow_lits = 0;
@@ -2369,6 +2446,8 @@ int isal_inflate(struct inflate_state *state)
 			if (state->copy_overflow_length != 0) {
 				byte_copy(state->next_out, state->copy_overflow_distance,
 					  state->copy_overflow_length);
+				for (ii = 0; ii < state->copy_overflow_length; ii++)
+					printf_debug("%s:%d 0x%02x\n", __FILE__, __LINE__, state->next_out[ii]);
 				state->tmp_out_valid += state->copy_overflow_length;
 				state->next_out += state->copy_overflow_length;
 				state->total_out += state->copy_overflow_length;
@@ -2390,6 +2469,8 @@ int isal_inflate(struct inflate_state *state)
 
 		memcpy(state->next_out,
 		       &state->tmp_out_buffer[state->tmp_out_processed], copy_size);
+		for (ii = 0; ii < copy_size; ii++)
+			printf_debugg("%s:%d 0x%02x\n", __FILE__, __LINE__, state->next_out[ii]);
 
 		state->tmp_out_processed += copy_size;
 		state->avail_out -= copy_size;

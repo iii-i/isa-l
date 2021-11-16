@@ -39,6 +39,7 @@
 #include <math.h>
 #include "test.h"
 #include "unaligned.h"
+#include "debug.h"
 
 #ifdef HAVE_GETOPT
 #include <getopt.h>
@@ -865,6 +866,12 @@ int inflate_check(uint8_t * z_buf, uint32_t z_size, uint8_t * in_buf, uint32_t i
 	uint8_t *test_buf = NULL;
 	int mem_result = 0;
 	int gzip_hdr_result = 0, gzip_trl_result = 0;
+	uint32_t ii;
+
+	for (ii = 0; ii < z_size; ii++)
+		printf_debug("z_buf[%u]: 0x%02x\n", ii, z_buf[ii]);
+	for (ii = 0; ii < in_size; ii++)
+		printf_debug("in_buf[%u]: 0x%02x\n", ii, in_buf[ii]);
 
 	if (in_size > 0) {
 		assert(in_buf != NULL);
@@ -951,6 +958,7 @@ int inflate_check(uint8_t * z_buf, uint32_t z_size, uint8_t * in_buf, uint32_t i
 		break;
 	}
 
+	printf_debug("inflate_check(): test_size = %d, in_size = %d\n", test_size, in_size);
 	if (test_size != in_size)
 		return INFLATE_INCORRECT_OUTPUT_SIZE;
 

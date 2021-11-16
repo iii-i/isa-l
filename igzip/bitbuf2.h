@@ -31,6 +31,7 @@
 
 #include "igzip_lib.h"
 #include "unaligned.h"
+#include "debug.h"
 
 #ifdef _MSC_VER
 #define inline __inline
@@ -78,6 +79,7 @@ static inline uint32_t buffer_bits_used(struct BitBuf2 *me)
 static inline void flush_bits(struct BitBuf2 *me)
 {
 	uint32_t bits;
+	printf_debug("flush_bits(pos=%ld, m_bits=0x%lx, m_bit_count=%u)\n", me->m_out_buf - me->m_out_start, me->m_bits, me->m_bit_count);
 	store_le_u64(me->m_out_buf, me->m_bits);
 	bits = me->m_bit_count & ~7;
 	me->m_bit_count -= bits;
@@ -91,6 +93,7 @@ static inline void flush(struct BitBuf2 *me)
 {
 	uint32_t bytes;
 	if (me->m_bit_count) {
+		printf_debug("flush(m_bits=0x%lx, m_bit_count=%u)\n", me->m_bits, me->m_bit_count);
 		store_le_u64(me->m_out_buf, me->m_bits);
 		bytes = (me->m_bit_count + 7) / 8;
 		me->m_out_buf += bytes;
@@ -109,12 +112,14 @@ static inline void check_space(struct BitBuf2 *me, uint32_t num_bits)
 
 static inline void write_bits_unsafe(struct BitBuf2 *me, uint64_t code, uint32_t count)
 {
+	printf_debug("write_bits_unsafe(0x%lx, %d)\n", code, count);
 	me->m_bits |= code << me->m_bit_count;
 	me->m_bit_count += count;
 }
 
 static inline void write_bits(struct BitBuf2 *me, uint64_t code, uint32_t count)
 {	/* Assumes there is space to fit code into m_bits. */
+	printf_debug("write_bits(0x%lx, %d)\n", code, count);
 	me->m_bits |= code << me->m_bit_count;
 	me->m_bit_count += count;
 	flush_bits(me);
@@ -122,6 +127,7 @@ static inline void write_bits(struct BitBuf2 *me, uint64_t code, uint32_t count)
 
 static inline void write_bits_flush(struct BitBuf2 *me, uint64_t code, uint32_t count)
 {	/* Assumes there is space to fit code into m_bits. */
+	printf_debug("write_bits_flush(0x%lx, %d)\n", code, count);
 	me->m_bits |= code << me->m_bit_count;
 	me->m_bit_count += count;
 	flush(me);
